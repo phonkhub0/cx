@@ -1,0 +1,1943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>xenonOS</title>
+<style>
+/* ============================================================
+   xenonOS — Design tokens
+   Palette: void #0A0A0F, ink #14141B, panel #1C1C26, mist #F5F6FA,
+            xenon-400 #60A5FA, xenon-500 #3B82F6, xenon-600 #2563EB,
+            white #FFFFFF, line rgba(255,255,255,.08)
+   Type: 'Inter' UI face, tight tracking on wordmark
+   Shape: large radii (14-26px), glassy translucency, soft blue glow
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+:root{
+  --void:#0A0A0F;
+  --ink:#14141b;
+  --panel:#1c1c26;
+  --panel-2:#23232f;
+  --mist:#f5f6fa;
+  --mist-2:#eaecf3;
+  --xenon-300:#93c5fd;
+  --xenon-400:#60a5fa;
+  --xenon-500:#3b82f6;
+  --xenon-600:#2563eb;
+  --xenon-glow: 0 0 40px rgba(59,130,246,.45);
+  --white:#ffffff;
+  --line: rgba(255,255,255,.09);
+  --line-soft: rgba(255,255,255,.06);
+  --r-xl: 26px;
+  --r-lg: 20px;
+  --r-md: 14px;
+  --r-sm: 10px;
+  --shadow-window: 0 30px 60px -20px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.06);
+  --shadow-pop: 0 20px 50px -15px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.08);
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+*{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color: transparent; }
+html,body{ width:100%; height:100%; overflow:hidden; font-family:var(--font); user-select:none; -webkit-user-select:none; }
+body{ background:var(--void); position:relative; }
+img{ -webkit-user-drag:none; }
+button{ font-family:inherit; border:none; background:none; cursor:pointer; color:inherit; }
+input{ font-family:inherit; }
+::selection{ background:var(--xenon-500); color:#fff; }
+::-webkit-scrollbar{ width:8px; height:8px; }
+::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.15); border-radius:10px; }
+::-webkit-scrollbar-track{ background:transparent; }
+
+#xenon-root{ width:100%; height:100%; position:relative; }
+
+/* ============================================================
+   BOOT SEQUENCE
+   Phase 1: black bg, white "x" centered
+   Phase 2: x pulls apart horizontally, "enonOS" types in around it -> "xenonOS"
+   Phase 3: colors invert (text -> black, bg -> white), then bg -> blue
+   Phase 4: blue circles bubble up from bottom, wordmark fades, cut to lock screen
+   ============================================================ */
+#boot{
+  position:fixed; inset:0; z-index:9999;
+  background:#000;
+  display:flex; align-items:center; justify-content:center;
+  overflow:hidden;
+  transition: background-color .9s cubic-bezier(.4,0,.2,1);
+}
+#boot.invert{ background:#fff; }
+#boot.blue{ background: linear-gradient(160deg,#2f6df0,#3b82f6 55%,#5b97ff); }
+
+#boot-word{
+  position:relative;
+  display:flex;
+  align-items:baseline;
+  font-weight:800;
+  font-size:clamp(54px, 12vw, 120px);
+  letter-spacing:-0.03em;
+  color:#fff;
+  transition: color .7s ease;
+}
+#boot.invert #boot-word{ color:#0c0c10; }
+#boot.blue #boot-word{ color:#fff; }
+
+#boot-word .bx{
+  display:inline-block;
+  transform: translateX(0);
+  transition: transform 1.05s cubic-bezier(.65,0,.35,1);
+  position:relative;
+  z-index:2;
+}
+#boot.pull #boot-word .bx{ transform: translateX(-0.16em); }
+
+#boot-word .brest{
+  display:inline-flex;
+  overflow:hidden;
+}
+#boot-word .brest span{
+  display:inline-block;
+  opacity:0;
+  transform: translateY(8px);
+  transition: opacity .42s ease, transform .42s ease;
+}
+#boot.reveal #boot-word .brest span{ opacity:1; transform:translateY(0); }
+
+#boot-tagline{
+  position:absolute;
+  bottom:18%;
+  left:50%;
+  transform:translateX(-50%);
+  font-size:13px;
+  letter-spacing:.18em;
+  text-transform:uppercase;
+  color:rgba(255,255,255,.55);
+  opacity:0;
+  transition:opacity .6s ease;
+  font-weight:500;
+}
+#boot.invert #boot-tagline{ color:rgba(10,10,15,.45); }
+#boot.blue #boot-tagline{ color:rgba(255,255,255,.7); }
+#boot.tagline #boot-tagline{ opacity:1; }
+
+#boot-bubbles{
+  position:absolute; inset:0; pointer-events:none;
+  opacity:0;
+  transition:opacity .3s ease;
+}
+#boot.bubbles #boot-bubbles{ opacity:1; }
+.bubble{
+  position:absolute;
+  bottom:-120px;
+  border-radius:50%;
+  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,.95), rgba(255,255,255,.15) 70%);
+  opacity:.9;
+  animation: bubbleUp 2.4s cubic-bezier(.2,.6,.3,1) forwards;
+}
+@keyframes bubbleUp{
+  0%{ transform: translateY(0) scale(.4); opacity:.95; }
+  70%{ opacity:.85; }
+  100%{ transform: translateY(-135vh) scale(1.05); opacity:0; }
+}
+
+#boot-out{
+  position:fixed; inset:0; background:#3b82f6; z-index:10000;
+  opacity:0; pointer-events:none;
+  transition:opacity .5s ease;
+}
+#boot-out.show{ opacity:1; }
+
+/* ============================================================
+   SHARED: glass surfaces, scrim, focus
+   ============================================================ */
+.glass{
+  background: rgba(28,28,38,.62);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  border:1px solid var(--line);
+}
+.glass-light{
+  background: rgba(255,255,255,.7);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border:1px solid rgba(255,255,255,.5);
+}
+:focus-visible{ outline:2px solid var(--xenon-400); outline-offset:2px; border-radius:8px; }
+
+/* App generic scrollable */
+.app-scroll{ overflow-y:auto; height:100%; }
+
+@media (prefers-reduced-motion: reduce){
+  *{ animation-duration:.001ms !important; transition-duration:.001ms !important; }
+}
+
+/* ============================================================
+   LOCK SCREEN / AUTH
+   ============================================================ */
+#lock{
+  position:fixed; inset:0; z-index:500;
+  background-size:cover; background-position:center;
+  background-image: linear-gradient(180deg, rgba(8,10,20,.25), rgba(8,10,20,.65)), 
+    radial-gradient(circle at 30% 20%, #2a4a8f, #0c1224 60%);
+  display:flex; flex-direction:column;
+  color:#fff;
+  opacity:1;
+  transition: opacity .5s ease, transform .5s ease;
+}
+#lock.hide{ opacity:0; transform:scale(1.04); pointer-events:none; }
+
+.lock-clock-zone{
+  flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  cursor:pointer;
+  text-align:center;
+}
+.lock-time{ font-size:clamp(64px,14vw,128px); font-weight:700; letter-spacing:-.02em; line-height:1; text-shadow:0 6px 30px rgba(0,0,0,.35);}
+.lock-date{ font-size:18px; font-weight:500; opacity:.85; margin-top:10px; }
+.lock-hint{ position:absolute; bottom:34px; left:50%; transform:translateX(-50%); font-size:13px; opacity:.7; letter-spacing:.04em; display:flex; flex-direction:column; align-items:center; gap:8px;}
+.lock-chevron{ width:26px; height:14px; opacity:.85; animation: chevronBob 1.8s ease-in-out infinite; }
+@keyframes chevronBob{ 0%,100%{ transform:translateY(0);} 50%{ transform:translateY(6px);} }
+
+.lock-auth{
+  position:fixed; inset:0;
+  z-index:550;
+  background: rgba(4,6,14,.35);
+  display:flex; align-items:center; justify-content:center;
+  opacity:0; pointer-events:none;
+  transition: opacity .4s ease;
+}
+.lock-auth.show{ opacity:1; pointer-events:all; }
+.lock-auth-card{
+  width:340px; max-width:88vw;
+  display:flex; flex-direction:column; align-items:center;
+  padding:38px 30px 30px;
+  border-radius:var(--r-xl);
+  text-align:center;
+  color:#fff;
+}
+.lock-avatar{
+  width:84px; height:84px; border-radius:50%;
+  background: linear-gradient(150deg,var(--xenon-400),var(--xenon-600));
+  display:flex; align-items:center; justify-content:center;
+  font-size:30px; font-weight:700; color:#fff;
+  box-shadow: var(--xenon-glow);
+  margin-bottom:14px;
+}
+.lock-username{ font-size:19px; font-weight:600; margin-bottom:20px; }
+.lock-pass-row{
+  width:100%; position:relative;
+  margin-bottom:10px;
+}
+.lock-pass-input{
+  width:100%; padding:13px 44px 13px 18px;
+  border-radius:999px;
+  background: rgba(255,255,255,.12);
+  border:1px solid rgba(255,255,255,.18);
+  color:#fff; font-size:15px;
+  outline:none;
+  transition:border-color .2s, background .2s;
+}
+.lock-pass-input::placeholder{ color:rgba(255,255,255,.55); }
+.lock-pass-input:focus{ border-color:var(--xenon-400); background:rgba(255,255,255,.16); }
+.lock-pass-go{
+  position:absolute; right:5px; top:5px; bottom:5px; width:34px;
+  border-radius:50%; background:rgba(255,255,255,.15);
+  display:flex; align-items:center; justify-content:center;
+  transition:background .2s;
+}
+.lock-pass-go:hover{ background:var(--xenon-500); }
+.lock-error{ font-size:13px; color:#ff9b9b; height:18px; margin-top:2px; }
+.lock-back{ font-size:13px; opacity:.7; margin-top:16px; cursor:pointer; }
+.lock-back:hover{ opacity:1; text-decoration:underline; }
+
+/* Setup / create account flow */
+#setup{
+  position:fixed; inset:0; z-index:600;
+  background: radial-gradient(circle at 25% 15%, #1c2c52, var(--void) 65%);
+  display:flex; align-items:center; justify-content:center;
+  color:#fff;
+}
+.setup-card{
+  width:420px; max-width:92vw;
+  padding:44px 38px;
+  border-radius:var(--r-xl);
+  display:flex; flex-direction:column; gap:18px;
+}
+.setup-logo{
+  display:flex; align-items:center; gap:10px; margin-bottom:6px;
+  font-weight:800; font-size:22px; letter-spacing:-.02em;
+}
+.setup-logo .dot{ width:10px; height:10px; border-radius:50%; background:var(--xenon-400); box-shadow:var(--xenon-glow);}
+.setup-title{ font-size:24px; font-weight:700; }
+.setup-sub{ font-size:14px; opacity:.65; line-height:1.5; margin-top:-10px; }
+.setup-field{ display:flex; flex-direction:column; gap:6px; }
+.setup-field label{ font-size:12px; font-weight:600; opacity:.7; letter-spacing:.03em; text-transform:uppercase; }
+.setup-field input{
+  padding:13px 16px; border-radius:var(--r-md);
+  background:rgba(255,255,255,.07); border:1px solid var(--line);
+  color:#fff; font-size:15px; outline:none;
+  transition:border-color .2s, background .2s;
+}
+.setup-field input:focus{ border-color:var(--xenon-400); background:rgba(255,255,255,.1); }
+.setup-avatars{ display:flex; gap:10px; flex-wrap:wrap; }
+.setup-avatar-opt{
+  width:46px; height:46px; border-radius:50%; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; font-size:20px;
+  border:2px solid transparent; transition:border-color .2s, transform .15s;
+}
+.setup-avatar-opt:hover{ transform:scale(1.08); }
+.setup-avatar-opt.sel{ border-color:var(--xenon-400); }
+.setup-err{ font-size:13px; color:#ff9b9b; min-height:16px; }
+.setup-btn{
+  margin-top:4px; padding:13px; border-radius:999px;
+  background: linear-gradient(135deg,var(--xenon-400),var(--xenon-600));
+  color:#fff; font-weight:600; font-size:15px;
+  transition: transform .15s, box-shadow .2s;
+}
+.setup-btn:hover{ box-shadow:var(--xenon-glow); transform:translateY(-1px); }
+.setup-btn:active{ transform:translateY(0); }
+.setup-btn:disabled{ opacity:.5; cursor:not-allowed; box-shadow:none; transform:none; }
+
+/* ============================================================
+   DESKTOP SHELL
+   ============================================================ */
+#desktop{
+  position:fixed; inset:0; overflow:hidden;
+  display:none;
+}
+.wallpaper{
+  position:absolute; inset:0; z-index:0;
+  background-size:cover; background-position:center;
+  transition: background .6s ease;
+}
+.wp-aurora{ background: radial-gradient(circle at 20% 15%, #284b8f, transparent 50%), radial-gradient(circle at 80% 80%, #1b2a55, transparent 55%), linear-gradient(160deg,#0c1224,#161b30 60%,#0c1224); }
+.wp-sunset{ background: linear-gradient(160deg,#ff9966,#ff5e62 45%,#6a3093); }
+.wp-mint{ background: linear-gradient(160deg,#11998e,#38ef7d); }
+.wp-mono{ background: linear-gradient(160deg,#232526,#414345); }
+.wp-violet{ background: radial-gradient(circle at 70% 20%, #5b2a86, transparent 55%), linear-gradient(160deg,#1a0b2e,#2d1b4e 60%,#1a0b2e); }
+
+.desk-icons{
+  position:absolute; top:18px; left:18px; z-index:1;
+  display:flex; flex-direction:column; gap:14px;
+}
+.desk-icon{
+  width:78px; display:flex; flex-direction:column; align-items:center; gap:6px;
+  padding:8px 4px; border-radius:var(--r-sm); cursor:pointer;
+}
+.desk-icon:hover{ background:rgba(255,255,255,.08); }
+.desk-icon .ic{ width:46px; height:46px; border-radius:var(--r-md); display:flex; align-items:center; justify-content:center; font-size:22px; }
+.desk-icon span{ font-size:12px; color:#fff; text-shadow:0 1px 4px rgba(0,0,0,.5); text-align:center; }
+
+/* Windows */
+.win{
+  position:absolute; min-width:320px; min-height:240px;
+  border-radius: var(--r-lg);
+  background: var(--ink);
+  box-shadow: var(--shadow-window);
+  display:flex; flex-direction:column;
+  overflow:hidden;
+  border:1px solid var(--line);
+  animation: winOpen .28s cubic-bezier(.2,.8,.3,1.1);
+}
+@keyframes winOpen{ from{ transform:scale(.92); opacity:0; } to{ transform:scale(1); opacity:1; } }
+.win.minimized{ display:none; }
+.win.maximized{ border-radius:0; }
+.win-titlebar{
+  height:44px; flex-shrink:0;
+  display:flex; align-items:center; gap:10px;
+  padding:0 14px;
+  background: rgba(255,255,255,.04);
+  border-bottom:1px solid var(--line-soft);
+  cursor:default;
+}
+.win-titlebar .tt{ font-size:13px; font-weight:600; color:#e8e9ee; flex:1; display:flex; align-items:center; gap:8px; }
+.win-titlebar .tt .ic{ font-size:15px; }
+.win-controls{ display:flex; gap:8px; }
+.win-dot{ width:13px; height:13px; border-radius:50%; display:flex; align-items:center; justify-content:center; transition:filter .15s; }
+.win-dot.close{ background:#ff5f57; }
+.win-dot.min{ background:#febc2e; }
+.win-dot.max{ background:#28c840; }
+.win-dot:hover{ filter:brightness(1.15); }
+.win-dot svg{ opacity:0; width:7px; height:7px; }
+.win-dot:hover svg{ opacity:.65; }
+.win-body{ flex:1; overflow:hidden; position:relative; background: var(--mist); color:#1a1a1f; }
+.win-body.dark{ background:var(--ink); color:#eceef3; }
+.win-resize{ position:absolute; right:0; bottom:0; width:18px; height:18px; cursor:nwse-resize; z-index:5; }
+
+/* Taskbar (Windows 11 style) */
+#taskbar{
+  position:absolute; left:50%; bottom:10px; transform:translateX(-50%);
+  z-index:200;
+  display:flex; align-items:center; gap:6px;
+  padding:6px 10px;
+  border-radius:18px;
+}
+.tb-search{
+  display:flex; align-items:center; gap:8px;
+  background:rgba(255,255,255,.08);
+  border-radius:999px; padding:8px 16px 8px 12px;
+  color:#cfd2e0; font-size:13px; cursor:pointer;
+  min-width:170px;
+  transition:background .15s;
+}
+.tb-search:hover{ background:rgba(255,255,255,.13); }
+.tb-divider{ width:1px; height:26px; background:var(--line); margin:0 2px; }
+.tb-btn{
+  width:44px; height:44px; border-radius:var(--r-md);
+  display:flex; align-items:center; justify-content:center;
+  font-size:19px; position:relative; transition:background .15s, transform .12s;
+}
+.tb-btn:hover{ background:rgba(255,255,255,.1); }
+.tb-btn:active{ transform:scale(.93); }
+.tb-btn.pinned-open::after{
+  content:''; position:absolute; bottom:-3px; left:50%; transform:translateX(-50%);
+  width:5px; height:5px; border-radius:50%; background:var(--xenon-400);
+}
+.tb-clock{
+  display:flex; flex-direction:column; align-items:flex-end; justify-content:center;
+  padding:4px 14px; border-radius:var(--r-sm); cursor:pointer; transition:background .15s;
+  font-size:12px; color:#e3e5ee; line-height:1.4;
+}
+.tb-clock:hover{ background:rgba(255,255,255,.08); }
+.tb-clock b{ font-size:13px; font-weight:600; }
+
+/* Start menu (Win11 style: centered, rounded, search + pinned grid + power) */
+#startmenu{
+  position:absolute; left:50%; bottom:74px; transform:translateX(-50%) translateY(12px) scale(.97);
+  width:560px; max-width:92vw; height:560px; max-height:75vh;
+  border-radius:var(--r-xl);
+  z-index:250;
+  opacity:0; pointer-events:none;
+  display:flex; flex-direction:column;
+  box-shadow:var(--shadow-pop);
+  transition: opacity .18s ease, transform .18s ease;
+  padding:26px 26px 18px;
+}
+#startmenu.open{ opacity:1; pointer-events:all; transform:translateX(-50%) translateY(0) scale(1); }
+.sm-search{
+  display:flex; align-items:center; gap:10px;
+  background:rgba(255,255,255,.08); border:1px solid var(--line);
+  border-radius:999px; padding:11px 18px; color:#cfd2e0; font-size:14px; margin-bottom:22px;
+}
+.sm-search input{ background:none; border:none; outline:none; color:#fff; font-size:14px; width:100%; }
+.sm-section-title{ font-size:13px; font-weight:600; color:#9aa0b4; margin-bottom:14px; display:flex; justify-content:space-between; }
+.sm-grid{
+  display:grid; grid-template-columns:repeat(5,1fr); gap:6px;
+  overflow-y:auto; flex:1;
+}
+.sm-app{
+  display:flex; flex-direction:column; align-items:center; gap:8px;
+  padding:14px 4px; border-radius:var(--r-md); cursor:pointer; transition:background .15s;
+}
+.sm-app:hover{ background:rgba(255,255,255,.08); }
+.sm-app .ic{ width:42px; height:42px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:20px; }
+.sm-app span{ font-size:11.5px; color:#e3e5ee; text-align:center; }
+.sm-footer{
+  display:flex; align-items:center; justify-content:space-between;
+  border-top:1px solid var(--line-soft); padding-top:16px; margin-top:10px;
+}
+.sm-profile{ display:flex; align-items:center; gap:10px; font-size:13.5px; color:#e3e5ee; cursor:pointer; padding:8px 10px; border-radius:var(--r-sm); transition:background .15s; }
+.sm-profile:hover{ background:rgba(255,255,255,.08); }
+.sm-profile .av{ width:28px; height:28px; border-radius:50%; background:linear-gradient(150deg,var(--xenon-400),var(--xenon-600)); display:flex; align-items:center; justify-content:center; font-size:14px; }
+.sm-power{ width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:16px; transition:background .15s; color:#e3e5ee;}
+.sm-power:hover{ background:rgba(255,255,255,.1); }
+
+/* Dock (macOS-style icon row, embedded in the taskbar) */
+#dock{
+  display:flex; align-items:center; gap:6px;
+}
+.dock-item{
+  width:44px; height:44px; border-radius:var(--r-md);
+  display:flex; align-items:center; justify-content:center; font-size:21px;
+  position:relative; cursor:pointer;
+  transition: transform .15s cubic-bezier(.3,1.5,.4,1);
+}
+.dock-item:hover{ transform:translateY(-8px) scale(1.1); }
+.dock-item::after{
+  content:''; position:absolute; bottom:-7px; left:50%; transform:translateX(-50%);
+  width:4px; height:4px; border-radius:50%; background:#fff; opacity:0; transition:opacity .15s;
+}
+.dock-item.running::after{ opacity:.85; }
+.dock-sep{ width:1px; height:30px; background:var(--line); margin:0 2px; align-self:center; }
+
+/* Top menu bar (mac-ish global bar on desktop) */
+#topbar{
+  position:absolute; top:0; left:0; right:0; height:30px; z-index:190;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 16px; font-size:12.5px; color:#e8e9ee;
+}
+#topbar .tb-left{ display:flex; align-items:center; gap:16px; font-weight:600; }
+#topbar .tb-right{ display:flex; align-items:center; gap:14px; }
+.topbar-clock{ cursor:pointer; }
+
+/* Context menu */
+.ctx-menu{
+  position:fixed; z-index:800; min-width:210px;
+  border-radius:var(--r-md); padding:6px;
+  box-shadow:var(--shadow-pop);
+  display:none;
+}
+.ctx-menu.open{ display:block; }
+.ctx-item{
+  padding:9px 12px; font-size:13px; color:#e3e5ee; border-radius:8px; cursor:pointer;
+  display:flex; align-items:center; gap:10px;
+}
+.ctx-item:hover{ background:rgba(255,255,255,.1); }
+.ctx-sep{ height:1px; background:var(--line); margin:5px 4px; }
+
+/* Notification toast */
+#toast-wrap{ position:absolute; top:38px; right:14px; z-index:900; display:flex; flex-direction:column; gap:10px; }
+.toast{
+  width:300px; padding:14px 16px; border-radius:var(--r-md);
+  box-shadow:var(--shadow-pop);
+  display:flex; gap:12px; align-items:flex-start;
+  animation: toastIn .25s ease;
+}
+@keyframes toastIn{ from{ transform:translateX(30px); opacity:0;} to{ transform:translateX(0); opacity:1;} }
+.toast .ic{ font-size:20px; }
+.toast .tx b{ display:block; font-size:13.5px; color:#fff; margin-bottom:2px; }
+.toast .tx p{ font-size:12.5px; color:#c7cadb; }
+
+/* ============================================================
+   MOBILE SHELL
+   ============================================================ */
+#mobile{
+  position:fixed; inset:0; overflow:hidden; display:none;
+}
+.m-statusbar{
+  position:absolute; top:0; left:0; right:0; height:env(safe-area-inset-top,28px); min-height:28px;
+  z-index:300; display:flex; align-items:center; justify-content:space-between;
+  padding:0 22px; font-size:13px; font-weight:600; color:#fff;
+}
+.m-home{
+  position:absolute; inset:0; z-index:1;
+  display:flex; flex-direction:column;
+  padding-top:calc(env(safe-area-inset-top,28px) + 18px);
+}
+.m-pages{
+  flex:1; display:flex; overflow-x:auto; scroll-snap-type:x mandatory;
+  -webkit-overflow-scrolling:touch;
+}
+.m-page{
+  min-width:100%; scroll-snap-align:start;
+  display:grid; grid-template-columns:repeat(4,1fr); gap:22px 14px;
+  padding:8px 22px; align-content:start;
+}
+.m-app{
+  display:flex; flex-direction:column; align-items:center; gap:6px;
+}
+.m-app .ic{
+  width:58px; height:58px; border-radius:16px; font-size:26px;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 6px 16px rgba(0,0,0,.25);
+  transition: transform .12s;
+}
+.m-app:active .ic{ transform:scale(.9); }
+.m-app span{ font-size:11px; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.4); }
+
+.m-dock-wrap{
+  flex-shrink:0; padding:10px 16px calc(env(safe-area-inset-bottom,10px) + 8px);
+}
+.m-dock{
+  display:flex; justify-content:space-around; align-items:center;
+  border-radius:28px; padding:10px 14px;
+}
+.m-dock .m-app .ic{ width:54px; height:54px; }
+.m-dock .m-app span{ display:none; }
+
+.m-home-indicator{
+  position:absolute; bottom:6px; left:50%; transform:translateX(-50%);
+  width:130px; height:5px; border-radius:99px; background:rgba(255,255,255,.65);
+  z-index:350;
+}
+
+/* Mobile lock screen tweaks reuse #lock; just ensure full coverage */
+.m-app-window{
+  position:fixed; inset:0; z-index:400;
+  display:flex; flex-direction:column;
+  background:var(--mist); color:#1a1a1f;
+  transform: translateY(100%);
+  transition: transform .32s cubic-bezier(.22,.9,.3,1);
+}
+.m-app-window.open{ transform:translateY(0); }
+.m-app-window.dark{ background:var(--ink); color:#eceef3; }
+.m-app-titlebar{
+  flex-shrink:0; padding-top:env(safe-area-inset-top,24px);
+  display:flex; align-items:center; gap:10px;
+  height:calc(52px + env(safe-area-inset-top,24px));
+  padding-left:14px; padding-right:14px;
+  border-bottom:1px solid rgba(0,0,0,.08);
+}
+.m-app-window.dark .m-app-titlebar{ border-bottom-color:var(--line); }
+.m-back-btn{ width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.06); }
+.m-app-window.dark .m-back-btn{ background:rgba(255,255,255,.08); }
+.m-app-title{ font-size:16px; font-weight:700; flex:1; }
+.m-app-body{ flex:1; overflow-y:auto; }
+
+.m-app-switcher{
+  position:fixed; inset:0; z-index:450; display:none;
+  background:rgba(10,10,16,.7); backdrop-filter:blur(20px);
+  flex-direction:column; align-items:center; justify-content:center; gap:16px;
+}
+.m-app-switcher.open{ display:flex; }
+.m-switch-card{
+  width:78vw; max-width:340px; height:48vh; border-radius:var(--r-xl);
+  background:var(--mist); overflow:hidden; position:relative;
+  box-shadow:var(--shadow-pop);
+}
+.m-switch-card .lbl{ position:absolute; top:10px; left:14px; font-size:13px; font-weight:700; color:#444; z-index:2; }
+
+/* App icon background colors (assigned via JS per-app) */
+.bg-blue{ background:linear-gradient(150deg,#5b9dff,#3b6fe0); }
+.bg-purple{ background:linear-gradient(150deg,#a78bfa,#7c3aed); }
+.bg-green{ background:linear-gradient(150deg,#4ade80,#16a34a); }
+.bg-orange{ background:linear-gradient(150deg,#fb923c,#ea580c); }
+.bg-pink{ background:linear-gradient(150deg,#f472b6,#db2777); }
+.bg-teal{ background:linear-gradient(150deg,#2dd4bf,#0d9488); }
+.bg-red{ background:linear-gradient(150deg,#f87171,#dc2626); }
+.bg-yellow{ background:linear-gradient(150deg,#fde047,#ca8a04); }
+.bg-gray{ background:linear-gradient(150deg,#9ca3af,#4b5563); }
+.bg-indigo{ background:linear-gradient(150deg,#818cf8,#4f46e5); }
+</style>
+</head>
+<body>
+
+<div id="xenon-root">
+
+  <!-- BOOT SEQUENCE -->
+  <div id="boot">
+    <div id="boot-word">
+      <span class="bx">x</span><span class="brest" id="boot-rest"></span>
+    </div>
+    <div id="boot-tagline">Welcome</div>
+    <div id="boot-bubbles"></div>
+  </div>
+  <div id="boot-out"></div>
+
+  <!-- Everything else mounts here after boot, via JS -->
+  <div id="app-mount" style="position:fixed;inset:0;display:none;"></div>
+
+  <!-- ACCOUNT SETUP (first run) -->
+  <div id="setup" style="display:none;">
+    <div class="setup-card glass">
+      <div class="setup-logo"><span class="dot"></span>xenonOS</div>
+      <div class="setup-title">Set up your account</div>
+      <div class="setup-sub">Create a profile to personalize and secure your xenonOS experience.</div>
+
+      <div class="setup-field">
+        <label>Your name</label>
+        <input id="setup-name" type="text" maxlength="20" placeholder="e.g. Alex">
+      </div>
+
+      <div class="setup-field">
+        <label>Choose an avatar</label>
+        <div class="setup-avatars" id="setup-avatars"></div>
+      </div>
+
+      <div class="setup-field">
+        <label>Password</label>
+        <input id="setup-pass" type="password" maxlength="40" placeholder="At least 4 characters">
+      </div>
+      <div class="setup-field">
+        <label>Confirm password</label>
+        <input id="setup-pass2" type="password" maxlength="40" placeholder="Re-enter password">
+      </div>
+
+      <div class="setup-err" id="setup-err"></div>
+      <button class="setup-btn" id="setup-submit">Create account</button>
+    </div>
+  </div>
+
+  <!-- LOCK SCREEN -->
+  <div id="lock" style="display:none;">
+    <div class="lock-clock-zone" id="lock-clock-zone">
+      <div class="lock-time" id="lock-time">--:--</div>
+      <div class="lock-date" id="lock-date">--</div>
+    </div>
+    <div class="lock-hint">
+      <svg class="lock-chevron" viewBox="0 0 24 12" fill="none"><path d="M2 2L12 10L22 2" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Click to sign in</span>
+    </div>
+  </div>
+
+  <div class="lock-auth" id="lock-auth">
+    <div class="lock-auth-card glass">
+      <div class="lock-avatar" id="lock-avatar">A</div>
+      <div class="lock-username" id="lock-username">Alex</div>
+      <div class="lock-pass-row">
+        <input class="lock-pass-input" id="lock-pass" type="password" placeholder="Password">
+        <div class="lock-pass-go" id="lock-pass-go">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12H19M19 12L13 6M19 12L13 18" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      </div>
+      <div class="lock-error" id="lock-error"></div>
+      <div class="lock-back" id="lock-back">Back</div>
+    </div>
+  </div>
+
+  <!-- ================= DESKTOP SHELL ================= -->
+  <div id="desktop">
+    <div class="wallpaper wp-aurora" id="wallpaper"></div>
+
+    <div id="topbar">
+      <div class="tb-left">
+        <span style="display:flex;align-items:center;gap:6px;"><span style="width:7px;height:7px;border-radius:50%;background:var(--xenon-400);display:inline-block;box-shadow:0 0 8px var(--xenon-400);"></span>xenonOS</span>
+        <span id="topbar-active-app">Desktop</span>
+      </div>
+      <div class="tb-right">
+        <span>🔆</span><span>🔊</span><span>📶</span>
+        <span class="topbar-clock" id="topbar-clock">--:--</span>
+      </div>
+    </div>
+
+    <div class="desk-icons" id="desk-icons"></div>
+
+    <div id="windows-layer"></div>
+
+    <div id="startmenu" class="glass">
+      <div class="sm-search">
+        <span>🔍</span>
+        <input id="sm-search-input" placeholder="Search apps...">
+      </div>
+      <div class="sm-section-title"><span>Pinned</span><span style="opacity:.6;cursor:pointer;" id="sm-all-apps">All apps &gt;</span></div>
+      <div class="sm-grid" id="sm-grid"></div>
+      <div class="sm-footer">
+        <div class="sm-profile" id="sm-profile">
+          <span class="av" id="sm-profile-av">A</span>
+          <span id="sm-profile-name">Alex</span>
+        </div>
+        <div class="sm-power" id="sm-power" title="Power">⏻</div>
+      </div>
+    </div>
+
+    <div id="taskbar" class="glass">
+      <div class="tb-search" id="tb-search-open"><span>🔍</span><span>Search</span></div>
+      <div class="tb-divider"></div>
+      <div class="tb-btn" id="tb-start-btn" title="Start">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="9" height="9" rx="2" fill="#60a5fa"/><rect x="13" y="2" width="9" height="9" rx="2" fill="#60a5fa"/><rect x="2" y="13" width="9" height="9" rx="2" fill="#60a5fa"/><rect x="13" y="13" width="9" height="9" rx="2" fill="#60a5fa"/></svg>
+      </div>
+      <div class="tb-divider"></div>
+      <div id="dock"></div>
+    </div>
+
+    <div id="toast-wrap"></div>
+
+    <div class="ctx-menu glass" id="desk-ctx">
+      <div class="ctx-item" data-act="personalize">🎨 Personalize</div>
+      <div class="ctx-item" data-act="newfolder">📁 New Folder</div>
+      <div class="ctx-sep"></div>
+      <div class="ctx-item" data-act="refresh">↻ Refresh</div>
+      <div class="ctx-sep"></div>
+      <div class="ctx-item" data-act="lock">🔒 Lock screen</div>
+    </div>
+  </div>
+
+  <!-- ================= MOBILE SHELL ================= -->
+  <div id="mobile">
+    <div class="wallpaper wp-aurora" id="m-wallpaper"></div>
+    <div class="m-statusbar">
+      <span id="m-clock">--:--</span>
+      <span>🔋📶🔆</span>
+    </div>
+    <div class="m-home">
+      <div class="m-pages" id="m-pages"></div>
+      <div class="m-dock-wrap">
+        <div class="m-dock glass" id="m-dock"></div>
+      </div>
+    </div>
+    <div class="m-home-indicator"></div>
+
+    <div id="m-windows-layer"></div>
+
+    <div class="m-app-switcher" id="m-app-switcher"></div>
+  </div>
+
+
+
+</div>
+
+<script>
+/* ============================================================
+   BOOT SEQUENCE CONTROLLER
+   ============================================================ */
+(function(){
+  const boot = document.getElementById('boot');
+  const rest = document.getElementById('boot-rest');
+  const word = "enonOS";
+  rest.innerHTML = word.split('').map(c=>`<span>${c}</span>`).join('');
+
+  const bubbleLayer = document.getElementById('boot-bubbles');
+  function spawnBubbles(){
+    const count = 26;
+    for(let i=0;i<count;i++){
+      const b = document.createElement('div');
+      b.className='bubble';
+      const size = 16 + Math.random()*72;
+      b.style.width = size+'px';
+      b.style.height = size+'px';
+      b.style.left = (Math.random()*100)+'%';
+      b.style.animationDelay = (Math.random()*0.6)+'s';
+      b.style.animationDuration = (2.2 + Math.random()*1.6)+'s';
+      bubbleLayer.appendChild(b);
+    }
+  }
+  function seq(){
+    setTimeout(()=> boot.classList.add('pull'), 550);        // x pulls apart
+    setTimeout(()=> boot.classList.add('reveal'), 950);       // enonOS types in
+    setTimeout(()=> boot.classList.add('tagline'), 1750);     // tagline fades in
+    setTimeout(()=> boot.classList.add('invert'), 2450);      // bg white, text black
+    setTimeout(()=> boot.classList.add('blue'), 3150);        // bg blue
+    setTimeout(()=> {                                          // bubbles rise (spawn fresh, right on cue)
+      spawnBubbles();
+      boot.classList.add('bubbles');
+    }, 3300);
+    setTimeout(()=> {
+      const out = document.getElementById('boot-out');
+      out.classList.add('show');
+      setTimeout(()=>{
+        boot.style.display='none';
+        out.style.display='none';
+        window.__xenonBootDone && window.__xenonBootDone();
+      }, 520);
+    }, 6000);
+  }
+  seq();
+})();
+</script>
+
+<script>
+/* ============================================================
+   ACCOUNT / AUTH SYSTEM
+   Persisted in localStorage so the account survives reloads.
+   ============================================================ */
+const Xenon = {
+  user: null,
+  device: null, // 'desktop' | 'mobile'
+  state: {}
+};
+
+const AVATAR_EMOJI = ['🦊','🐼','🐧','🐙','🦉','🐬','🦁','🐲','🌙','⚡','🌌','🔷'];
+
+function loadUser(){
+  try{
+    const raw = localStorage.getItem('xenon_user');
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){ return null; }
+}
+function saveUser(u){
+  try{ localStorage.setItem('xenon_user', JSON.stringify(u)); }catch(e){}
+}
+function loadPrefs(){
+  try{
+    const raw = localStorage.getItem('xenon_prefs');
+    return raw ? JSON.parse(raw) : { wallpaper:'aurora', accent:'#3b82f6', theme:'dark' };
+  }catch(e){ return { wallpaper:'aurora', accent:'#3b82f6', theme:'dark' }; }
+}
+function savePrefs(p){ try{ localStorage.setItem('xenon_prefs', JSON.stringify(p)); }catch(e){} }
+
+function detectDevice(){
+  const isTouchPrimary = window.matchMedia('(pointer: coarse)').matches;
+  const narrow = window.innerWidth <= 900;
+  const ua = navigator.userAgent || '';
+  const uaMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
+  return (isTouchPrimary && narrow) || uaMobile ? 'mobile' : 'desktop';
+}
+
+function buildAvatarPicker(){
+  const wrap = document.getElementById('setup-avatars');
+  wrap.innerHTML = '';
+  let selected = AVATAR_EMOJI[0];
+  AVATAR_EMOJI.forEach((emo, i)=>{
+    const el = document.createElement('div');
+    el.className = 'setup-avatar-opt' + (i===0?' sel':'');
+    el.textContent = emo;
+    el.style.background = i===0 ? 'rgba(59,130,246,.25)' : 'rgba(255,255,255,.07)';
+    el.addEventListener('click', ()=>{
+      wrap.querySelectorAll('.setup-avatar-opt').forEach(n=>{ n.classList.remove('sel'); n.style.background='rgba(255,255,255,.07)';});
+      el.classList.add('sel');
+      el.style.background = 'rgba(59,130,246,.25)';
+      selected = emo;
+    });
+    wrap.appendChild(el);
+  });
+  return ()=>selected;
+}
+
+function initSetupFlow(){
+  document.getElementById('setup').style.display = 'flex';
+  const getAvatar = buildAvatarPicker();
+  const errEl = document.getElementById('setup-err');
+  document.getElementById('setup-submit').addEventListener('click', ()=>{
+    const name = document.getElementById('setup-name').value.trim();
+    const pass = document.getElementById('setup-pass').value;
+    const pass2 = document.getElementById('setup-pass2').value;
+    if(!name){ errEl.textContent = 'Please enter a name.'; return; }
+    if(pass.length < 4){ errEl.textContent = 'Password must be at least 4 characters.'; return; }
+    if(pass !== pass2){ errEl.textContent = 'Passwords do not match.'; return; }
+    const user = { name, pass, avatar: getAvatar(), createdAt: Date.now() };
+    saveUser(user);
+    Xenon.user = user;
+    errEl.textContent='';
+    document.getElementById('setup').style.display='none';
+    showLock(true);
+  });
+  // Enter key support
+  ['setup-name','setup-pass','setup-pass2'].forEach(id=>{
+    document.getElementById(id).addEventListener('keydown', e=>{
+      if(e.key==='Enter') document.getElementById('setup-submit').click();
+    });
+  });
+}
+
+function tickClock(){
+  const t = document.getElementById('lock-time');
+  const d = document.getElementById('lock-date');
+  if(!t) return;
+  const now = new Date();
+  let h = now.getHours(), m = now.getMinutes();
+  const ampm = h>=12 ? 'PM':'AM';
+  let h12 = h%12; if(h12===0) h12=12;
+  t.textContent = `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
+  d.textContent = now.toLocaleDateString(undefined,{ weekday:'long', month:'long', day:'numeric' });
+}
+
+function showLock(justCreated){
+  document.getElementById('lock').style.display = 'flex';
+  document.getElementById('lock').classList.remove('hide');
+  tickClock();
+  if(window.__xenonClockTimer) clearInterval(window.__xenonClockTimer);
+  window.__xenonClockTimer = setInterval(tickClock, 15000);
+
+  document.getElementById('lock-username').textContent = Xenon.user.name;
+  document.getElementById('lock-avatar').textContent = Xenon.user.avatar || Xenon.user.name[0].toUpperCase();
+
+  const authPanel = document.getElementById('lock-auth');
+  const clockZone = document.getElementById('lock-clock-zone');
+  const passInput = document.getElementById('lock-pass');
+  const errEl = document.getElementById('lock-error');
+
+  function openAuth(){
+    authPanel.classList.add('show');
+    document.querySelector('.lock-hint').style.opacity = '0';
+    passInput.value=''; errEl.textContent='';
+    setTimeout(()=>passInput.focus(), 250);
+  }
+  function closeAuth(){
+    authPanel.classList.remove('show');
+    document.querySelector('.lock-hint').style.opacity = '1';
+  }
+  clockZone.onclick = openAuth;
+  document.getElementById('lock-back').onclick = closeAuth;
+
+  function attemptLogin(){
+    if(passInput.value === Xenon.user.pass){
+      document.getElementById('lock').classList.add('hide');
+      authPanel.classList.remove('show');
+      clearInterval(window.__xenonClockTimer);
+      setTimeout(()=>{
+        document.getElementById('lock').style.display='none';
+        launchDesktop();
+      }, 480);
+    } else {
+      errEl.textContent = 'Incorrect password. Try again.';
+      passInput.value='';
+      passInput.focus();
+    }
+  }
+  document.getElementById('lock-pass-go').onclick = attemptLogin;
+  passInput.onkeydown = (e)=>{ if(e.key==='Enter') attemptLogin(); };
+
+  if(justCreated) openAuth();
+}
+
+window.__xenonBootDone = function(){
+  Xenon.device = detectDevice();
+  const existing = loadUser();
+  if(existing){
+    Xenon.user = existing;
+    showLock(false);
+  } else {
+    initSetupFlow();
+  }
+};
+</script>
+
+<script>
+/* ============================================================
+   APP REGISTRY
+   Each app: id, name, icon (emoji), bg (color class), render(container, windowApi)
+   render() builds the app's UI inside the given container.
+   ============================================================ */
+const APPS = {};
+function registerApp(def){ APPS[def.id] = def; }
+
+let prefs = loadPrefs();
+
+const WALLPAPERS = {
+  aurora: 'wp-aurora', sunset:'wp-sunset', mint:'wp-mint', mono:'wp-mono', violet:'wp-violet'
+};
+
+function applyWallpaper(){
+  const cls = WALLPAPERS[prefs.wallpaper] || 'wp-aurora';
+  ['wallpaper','m-wallpaper'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.className = 'wallpaper ' + cls;
+  });
+}
+function applyAccent(){
+  document.documentElement.style.setProperty('--xenon-400', prefs.accent || '#60a5fa');
+  document.documentElement.style.setProperty('--xenon-500', prefs.accentMid || prefs.accent || '#3b82f6');
+  document.documentElement.style.setProperty('--xenon-600', prefs.accentDark || prefs.accent || '#2563eb');
+}
+
+function toast(title, msg, icon='🔔'){
+  const wrap = document.getElementById('toast-wrap');
+  if(!wrap) return;
+  const t = document.createElement('div');
+  t.className = 'toast glass';
+  t.innerHTML = `<span class="ic">${icon}</span><div class="tx"><b>${title}</b><p>${msg}</p></div>`;
+  wrap.appendChild(t);
+  setTimeout(()=>{ t.style.transition='opacity .3s, transform .3s'; t.style.opacity='0'; t.style.transform='translateX(30px)'; setTimeout(()=>t.remove(),320); }, 3600);
+}
+
+/* ============================================================
+   WINDOW MANAGER (desktop)
+   ============================================================ */
+const WM = {
+  windows: {}, // id -> {el, appId, z}
+  zTop: 10,
+  count: 0
+};
+
+function openApp(appId){
+  const app = APPS[appId];
+  if(!app) return;
+  if(Xenon.device === 'mobile'){ openMobileApp(appId); return; }
+
+  // If already open, focus it instead of duplicating (singleton apps)
+  const existingId = Object.keys(WM.windows).find(id => WM.windows[id].appId === appId && app.singleton !== false);
+  if(existingId){
+    focusWindow(existingId);
+    const w = WM.windows[existingId];
+    if(w.el.classList.contains('minimized')) toggleMinimize(existingId);
+    return;
+  }
+
+  WM.count++;
+  const winId = 'win-' + WM.count;
+  const el = document.createElement('div');
+  el.className = 'win';
+  el.style.width = (app.w||640)+'px';
+  el.style.height = (app.h||440)+'px';
+  const layer = document.getElementById('windows-layer');
+  const offset = (Object.keys(WM.windows).length % 6) * 26;
+  el.style.left = (Math.max(40,(window.innerWidth-(app.w||640))/2) + offset - 60) + 'px';
+  el.style.top = (Math.max(50,(window.innerHeight-(app.h||440))/2 - 30) + offset) + 'px';
+
+  el.innerHTML = `
+    <div class="win-titlebar" data-drag="${winId}">
+      <div class="tt"><span class="ic">${app.icon}</span>${app.name}</div>
+      <div class="win-controls">
+        <div class="win-dot min" data-act="min"><svg viewBox="0 0 10 10"><rect x="1" y="4" width="8" height="2" fill="#5c4400"/></svg></div>
+        <div class="win-dot max" data-act="max"><svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" fill="none" stroke="#0b4f10" stroke-width="1.3"/></svg></div>
+        <div class="win-dot close" data-act="close"><svg viewBox="0 0 10 10"><line x1="1" y1="1" x2="9" y2="9" stroke="#7a0000" stroke-width="1.4"/><line x1="9" y1="1" x2="1" y2="9" stroke="#7a0000" stroke-width="1.4"/></svg></div>
+      </div>
+    </div>
+    <div class="win-body ${app.dark?'dark':''}" id="${winId}-body"></div>
+    <div class="win-resize" data-resize="${winId}"></div>
+  `;
+  layer.appendChild(el);
+  WM.windows[winId] = { el, appId, z: ++WM.zTop, maximized:false, prevRect:null };
+  el.style.zIndex = WM.windows[winId].z;
+  focusWindow(winId);
+
+  // render app content
+  const winApi = {
+    close: ()=>closeWindow(winId),
+    setTitle: (t)=>{ el.querySelector('.tt').lastChild.textContent=' '+t; },
+    toast,
+    isMobile: false
+  };
+  app.render(document.getElementById(winId+'-body'), winApi);
+
+  // controls
+  el.querySelector('[data-act="close"]').onclick = (e)=>{ e.stopPropagation(); closeWindow(winId); };
+  el.querySelector('[data-act="min"]').onclick = (e)=>{ e.stopPropagation(); toggleMinimize(winId); };
+  el.querySelector('[data-act="max"]').onclick = (e)=>{ e.stopPropagation(); toggleMaximize(winId); };
+  el.querySelector('.win-titlebar').addEventListener('dblclick', ()=>toggleMaximize(winId));
+  el.addEventListener('mousedown', ()=>focusWindow(winId));
+
+  makeDraggable(el, el.querySelector('.win-titlebar'), winId);
+  makeResizable(el, el.querySelector('.win-resize'));
+
+  renderDock();
+}
+
+function closeWindow(winId){
+  const w = WM.windows[winId];
+  if(!w) return;
+  w.el.remove();
+  delete WM.windows[winId];
+  renderDock();
+  updateTopbarActiveApp();
+}
+function toggleMinimize(winId){
+  const w = WM.windows[winId];
+  w.el.classList.toggle('minimized');
+  renderDock();
+  updateTopbarActiveApp();
+}
+function toggleMaximize(winId){
+  const w = WM.windows[winId];
+  const el = w.el;
+  if(!w.maximized){
+    w.prevRect = { left:el.style.left, top:el.style.top, width:el.style.width, height:el.style.height };
+    el.style.left='0px'; el.style.top='30px'; el.style.width='100vw'; el.style.height='calc(100vh - 30px)';
+    el.classList.add('maximized');
+    w.maximized = true;
+  } else {
+    Object.assign(el.style, w.prevRect);
+    el.classList.remove('maximized');
+    w.maximized = false;
+  }
+}
+function focusWindow(winId){
+  const w = WM.windows[winId];
+  if(!w) return;
+  w.z = ++WM.zTop;
+  w.el.style.zIndex = w.z;
+  document.querySelectorAll('.win').forEach(el=>el.style.boxShadow='var(--shadow-window)');
+  updateTopbarActiveApp(w.appId);
+  renderDock();
+}
+function updateTopbarActiveApp(appId){
+  const label = document.getElementById('topbar-active-app');
+  if(!label) return;
+  if(appId && APPS[appId]) label.textContent = APPS[appId].name;
+  else {
+    const open = Object.values(WM.windows).filter(w=>!w.el.classList.contains('minimized'));
+    label.textContent = open.length ? APPS[open[open.length-1].appId].name : 'Desktop';
+  }
+}
+
+function makeDraggable(el, handle, winId){
+  let sx,sy,ox,oy,dragging=false;
+  handle.addEventListener('mousedown', (e)=>{
+    if(e.target.closest('.win-dot')) return;
+    if(WM.windows[winId].maximized) return;
+    dragging=true;
+    sx=e.clientX; sy=e.clientY;
+    const r = el.getBoundingClientRect();
+    ox=r.left; oy=r.top;
+    document.body.style.userSelect='none';
+  });
+  window.addEventListener('mousemove', (e)=>{
+    if(!dragging) return;
+    el.style.left = (ox + (e.clientX-sx)) + 'px';
+    el.style.top = Math.max(30, oy + (e.clientY-sy)) + 'px';
+  });
+  window.addEventListener('mouseup', ()=>{ dragging=false; document.body.style.userSelect=''; });
+}
+function makeResizable(el, handle){
+  let sx,sy,sw,sh,resizing=false;
+  handle.addEventListener('mousedown', (e)=>{
+    e.stopPropagation(); resizing=true;
+    sx=e.clientX; sy=e.clientY;
+    sw=el.offsetWidth; sh=el.offsetHeight;
+  });
+  window.addEventListener('mousemove', (e)=>{
+    if(!resizing) return;
+    el.style.width = Math.max(320, sw + (e.clientX-sx)) + 'px';
+    el.style.height = Math.max(240, sh + (e.clientY-sy)) + 'px';
+  });
+  window.addEventListener('mouseup', ()=>{ resizing=false; });
+}
+
+/* ============================================================
+   DESKTOP BUILD: icons, dock, start menu
+   ============================================================ */
+const PINNED_APPS = ['files','browser','notes','calculator','settings','photos','terminal','mail'];
+const DESKTOP_ICON_APPS = ['files','browser','notes','trash'];
+
+function buildDesktopIcons(){
+  const wrap = document.getElementById('desk-icons');
+  wrap.innerHTML='';
+  DESKTOP_ICON_APPS.forEach(id=>{
+    const app = APPS[id];
+    if(!app) return;
+    const el = document.createElement('div');
+    el.className = 'desk-icon';
+    el.innerHTML = `<div class="ic ${app.bg}">${app.icon}</div><span>${app.name}</span>`;
+    el.ondblclick = ()=>openApp(id);
+    el.onclick = (e)=>{ document.querySelectorAll('.desk-icon').forEach(n=>n.style.background=''); el.style.background='rgba(255,255,255,.12)'; };
+    wrap.appendChild(el);
+  });
+}
+
+function buildDock(){
+  renderDock();
+}
+function renderDock(){
+  const dock = document.getElementById('dock');
+  if(!dock) return;
+  dock.innerHTML='';
+  const running = new Set(Object.values(WM.windows).map(w=>w.appId));
+  const order = [...new Set([...PINNED_APPS])];
+  order.forEach((id, i)=>{
+    const app = APPS[id];
+    if(!app) return;
+    const el = document.createElement('div');
+    el.className = 'dock-item ' + app.bg + (running.has(id)?' running':'');
+    el.innerHTML = app.icon;
+    el.title = app.name;
+    el.onclick = ()=>openApp(id);
+    dock.appendChild(el);
+  });
+  // separator + trash
+  const sep = document.createElement('div'); sep.className='dock-sep'; dock.appendChild(sep);
+  const trash = APPS['trash'];
+  const tEl = document.createElement('div');
+  tEl.className='dock-item '+trash.bg;
+  tEl.innerHTML = trash.icon; tEl.title='Trash';
+  tEl.onclick = ()=>openApp('trash');
+  dock.appendChild(tEl);
+}
+
+function buildStartMenuGrid(filter){
+  const grid = document.getElementById('sm-grid');
+  grid.innerHTML='';
+  const ids = Object.keys(APPS).filter(id=>!APPS[id].hidden);
+  const filtered = filter ? ids.filter(id=> APPS[id].name.toLowerCase().includes(filter.toLowerCase())) : ids;
+  if(filtered.length===0){
+    grid.innerHTML = `<div style="grid-column:1/-1; text-align:center; color:#9aa0b4; padding:30px 0; font-size:13px;">No apps match "${filter}"</div>`;
+    return;
+  }
+  filtered.forEach(id=>{
+    const app = APPS[id];
+    const el = document.createElement('div');
+    el.className='sm-app';
+    el.innerHTML = `<div class="ic ${app.bg}">${app.icon}</div><span>${app.name}</span>`;
+    el.onclick = ()=>{ openApp(id); closeStartMenu(); };
+    grid.appendChild(el);
+  });
+}
+
+function openStartMenu(){
+  document.getElementById('startmenu').classList.add('open');
+  document.getElementById('sm-search-input').value='';
+  buildStartMenuGrid('');
+  setTimeout(()=>document.getElementById('sm-search-input').focus(),120);
+}
+function closeStartMenu(){ document.getElementById('startmenu').classList.remove('open'); }
+function toggleStartMenu(){
+  const sm = document.getElementById('startmenu');
+  sm.classList.contains('open') ? closeStartMenu() : openStartMenu();
+}
+
+function tickTopbarClock(){
+  const now = new Date();
+  let h=now.getHours(), m=now.getMinutes();
+  const ampm = h>=12?'PM':'AM'; let h12=h%12; if(h12===0) h12=12;
+  const str = `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
+  const a = document.getElementById('topbar-clock'); if(a) a.textContent = str;
+  const c = document.getElementById('m-clock'); if(c) c.textContent = str;
+}
+
+/* ============================================================
+   MOBILE SHELL BUILD
+   ============================================================ */
+const MOBILE_HOME_APPS = ['files','browser','notes','calculator','photos','settings','weather','clock','calendar','mail','music','terminal'];
+const MOBILE_DOCK_APPS = ['browser','notes','photos','settings'];
+
+function buildMobileHome(){
+  const pages = document.getElementById('m-pages');
+  pages.innerHTML='';
+  const perPage = 16;
+  const ids = MOBILE_HOME_APPS.filter(id=>APPS[id]);
+  const pageCount = Math.max(1, Math.ceil(ids.length/perPage));
+  for(let p=0; p<pageCount; p++){
+    const page = document.createElement('div');
+    page.className='m-page';
+    ids.slice(p*perPage,(p+1)*perPage).forEach(id=>{
+      const app = APPS[id];
+      const el = document.createElement('div');
+      el.className='m-app';
+      el.innerHTML = `<div class="ic ${app.bg}">${app.icon}</div><span>${app.name}</span>`;
+      el.onclick = ()=>openMobileApp(id);
+      page.appendChild(el);
+    });
+    pages.appendChild(page);
+  }
+  const dock = document.getElementById('m-dock');
+  dock.innerHTML='';
+  MOBILE_DOCK_APPS.forEach(id=>{
+    const app = APPS[id];
+    if(!app) return;
+    const el = document.createElement('div');
+    el.className='m-app';
+    el.innerHTML = `<div class="ic ${app.bg}">${app.icon}</div><span>${app.name}</span>`;
+    el.onclick = ()=>openMobileApp(id);
+    dock.appendChild(el);
+  });
+}
+
+const MWM = { stack:[] };
+function openMobileApp(appId){
+  const app = APPS[appId];
+  if(!app) return;
+  const layer = document.getElementById('m-windows-layer');
+  const el = document.createElement('div');
+  el.className = 'm-app-window ' + (app.dark?'dark':'');
+  el.innerHTML = `
+    <div class="m-app-titlebar">
+      <div class="m-back-btn" data-act="back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 5L8 12L15 19" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="m-app-title">${app.icon} ${app.name}</div>
+    </div>
+    <div class="m-app-body" id="m-body-${appId}-${MWM.stack.length}"></div>
+  `;
+  layer.appendChild(el);
+  requestAnimationFrame(()=>el.classList.add('open'));
+  const bodyId = `m-body-${appId}-${MWM.stack.length}`;
+  MWM.stack.push({el, appId});
+  const winApi = { close: ()=>closeMobileApp(el), setTitle:(t)=>{el.querySelector('.m-app-title').textContent=app.icon+' '+t;}, toast, isMobile: true };
+  app.render(document.getElementById(bodyId), winApi);
+  el.querySelector('[data-act="back"]').onclick = ()=>closeMobileApp(el);
+}
+function closeMobileApp(el){
+  el.classList.remove('open');
+  setTimeout(()=>{
+    el.remove();
+    MWM.stack = MWM.stack.filter(s=>s.el!==el);
+  }, 320);
+}
+
+/* ============================================================
+   LAUNCH: switches from lock screen into desktop or mobile shell
+   ============================================================ */
+function launchDesktop(){
+  applyWallpaper();
+  applyAccent();
+
+  if(Xenon.device === 'mobile'){
+    document.getElementById('mobile').style.display='block';
+    buildMobileHome();
+  } else {
+    document.getElementById('desktop').style.display='block';
+    buildDesktopIcons();
+    buildStartMenuGrid('');
+    buildDock();
+    renderDock();
+    document.getElementById('sm-profile-av').textContent = Xenon.user.avatar || Xenon.user.name[0].toUpperCase();
+    document.getElementById('sm-profile-name').textContent = Xenon.user.name;
+  }
+
+  if(window.__xenonClockTimer) clearInterval(window.__xenonClockTimer);
+  tickTopbarClock();
+  window.__xenonClockTimer = setInterval(tickTopbarClock, 10000);
+
+  // Start menu interactions
+  document.getElementById('tb-start-btn').addEventListener('click', (e)=>{ e.stopPropagation(); toggleStartMenu(); });
+  document.getElementById('tb-search-open').addEventListener('click', (e)=>{ e.stopPropagation(); openStartMenu(); });
+  document.getElementById('sm-search-input').addEventListener('input', (e)=> buildStartMenuGrid(e.target.value));
+  document.getElementById('sm-all-apps').addEventListener('click', ()=> buildStartMenuGrid(''));
+  document.getElementById('sm-power').addEventListener('click', (e)=>{ e.stopPropagation(); lockNow(); });
+  document.getElementById('sm-profile').addEventListener('click', ()=>{ openApp('settings'); closeStartMenu(); });
+
+  document.addEventListener('click', (e)=>{
+    const sm = document.getElementById('startmenu');
+    if(sm.classList.contains('open') && !sm.contains(e.target) && e.target.id!=='tb-start-btn' && !e.target.closest('#tb-start-btn')){
+      closeStartMenu();
+    }
+    const ctx = document.getElementById('desk-ctx');
+    if(ctx.classList.contains('open') && !ctx.contains(e.target)){ ctx.classList.remove('open'); }
+  });
+
+  // Desktop right-click context menu
+  document.getElementById('desktop').addEventListener('contextmenu', (e)=>{
+    if(e.target.closest('.win') || e.target.closest('#taskbar') || e.target.closest('#startmenu')) return;
+    e.preventDefault();
+    const ctx = document.getElementById('desk-ctx');
+    ctx.style.left = Math.min(e.clientX, window.innerWidth-220) + 'px';
+    ctx.style.top = Math.min(e.clientY, window.innerHeight-220) + 'px';
+    ctx.classList.add('open');
+  });
+  document.querySelectorAll('#desk-ctx .ctx-item').forEach(item=>{
+    item.addEventListener('click', ()=>{
+      const act = item.dataset.act;
+      document.getElementById('desk-ctx').classList.remove('open');
+      if(act==='personalize') openApp('settings');
+      else if(act==='lock') lockNow();
+      else if(act==='refresh') toast('Desktop','Refreshed','↻');
+      else if(act==='newfolder') toast('Files','New folder created on desktop','📁');
+    });
+  });
+
+  toast('Welcome back', `Signed in as ${Xenon.user.name}`, '👋');
+}
+
+function lockNow(){
+  document.getElementById('desktop').style.display='none';
+  document.getElementById('mobile').style.display='none';
+  closeStartMenu();
+  showLock(false);
+}
+</script>
+
+<script>
+/* ============================================================
+   BUILT-IN APPS
+   ============================================================ */
+
+/* ---------- Files ---------- */
+registerApp({
+  id:'files', name:'Files', icon:'📁', bg:'bg-yellow', w:680, h:460,
+  render(container, api){
+    const folders = [
+      {n:'Documents', i:'📄', c:12}, {n:'Pictures', i:'🖼️', c:34}, {n:'Music', i:'🎵', c:8},
+      {n:'Downloads', i:'⬇️', c:5}, {n:'Desktop', i:'🖥️', c:4}, {n:'Projects', i:'💼', c:7}
+    ];
+    const isMobile = api && api.isMobile;
+    container.innerHTML = `
+      <div style="display:flex;height:100%;">
+        ${isMobile ? '' : `<div style="width:170px;background:rgba(0,0,0,.035);border-right:1px solid rgba(0,0,0,.07);padding:14px 8px;">
+          ${['Home','Recents','Favorites','iCloud'].map((s,i)=>`<div style="padding:9px 12px;border-radius:9px;font-size:13px;margin-bottom:2px;${i===0?'background:rgba(59,130,246,.15);font-weight:600;':''}cursor:pointer;">${s}</div>`).join('')}
+        </div>`}
+        <div style="flex:1;padding:20px;overflow-y:auto;">
+          <div style="font-weight:700;font-size:15px;margin-bottom:16px;">Home</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,86px);gap:18px;">
+            ${folders.map(f=>`
+              <div style="display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;padding:8px;border-radius:10px;" onmouseover="this.style.background='rgba(0,0,0,.05)'" onmouseout="this.style.background='none'">
+                <div style="font-size:36px;">${f.i}</div>
+                <div style="font-size:12px;text-align:center;font-weight:500;">${f.n}</div>
+                <div style="font-size:10px;color:#888;">${f.c} items</div>
+              </div>`).join('')}
+          </div>
+        </div>
+      </div>`;
+  }
+});
+
+/* ---------- Browser ---------- */
+registerApp({
+  id:'browser', name:'Browser', icon:'🌐', bg:'bg-blue', w:760, h:520,
+  render(container){
+    container.innerHTML = `
+      <div style="display:flex;flex-direction:column;height:100%;">
+        <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.08);">
+          <span style="opacity:.5;">←</span><span style="opacity:.3;">→</span><span style="opacity:.6;">↻</span>
+          <div style="flex:1;background:rgba(0,0,0,.05);border-radius:999px;padding:7px 16px;font-size:13px;color:#555;">🔒 home.xenonos.local</div>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:linear-gradient(160deg,#eef3ff,#f5f6fa);">
+          <div style="font-size:54px;">🌐</div>
+          <div style="font-size:22px;font-weight:700;color:#222;">xenonOS Browser</div>
+          <div style="font-size:13.5px;color:#777;max-width:320px;text-align:center;">This is a simulated browser inside xenonOS. Type any address to search.</div>
+          <div style="display:flex;background:#fff;border-radius:999px;box-shadow:0 4px 18px rgba(0,0,0,.1);padding:10px 18px;width:380px;">
+            <input id="browser-url" placeholder="Search or enter address" style="border:none;outline:none;flex:1;font-size:13.5px;">
+          </div>
+        </div>
+      </div>`;
+    container.querySelector('#browser-url').addEventListener('keydown', e=>{
+      if(e.key==='Enter') toast('Browser', `Would navigate to "${e.target.value}"`, '🌐');
+    });
+  }
+});
+
+/* ---------- Notes ---------- */
+registerApp({
+  id:'notes', name:'Notes', icon:'📝', bg:'bg-orange', w:600, h:460,
+  render(container, api){
+    function load(){ try{ return JSON.parse(localStorage.getItem('xenon_notes')||'[]'); }catch(e){ return []; } }
+    function save(notes){ localStorage.setItem('xenon_notes', JSON.stringify(notes)); }
+    let notes = load();
+    if(notes.length===0) notes = [{id:1, title:'Welcome to Notes', body:'Type anything here. Your notes are saved automatically.'}];
+    let activeId = notes[0].id;
+
+    if(api && api.isMobile){
+      // Mobile: list-first, tap a note to open a full-screen editor with its own back arrow.
+      let view = 'list';
+      function renderMobile(){
+        if(view==='list'){
+          container.innerHTML = `
+            <div style="display:flex;flex-direction:column;height:100%;">
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid rgba(0,0,0,.06);">
+                <span style="font-weight:700;font-size:15px;">Notes</span>
+                <span id="notes-add" style="cursor:pointer;font-size:20px;">➕</span>
+              </div>
+              <div id="notes-list" style="overflow-y:auto;flex:1;"></div>
+            </div>`;
+          const list = container.querySelector('#notes-list');
+          list.innerHTML = notes.map(n=>`
+            <div data-id="${n.id}" style="padding:14px 16px;border-bottom:1px solid rgba(0,0,0,.05);">
+              <div style="font-size:14.5px;font-weight:600;">${n.title||'Untitled'}</div>
+              <div style="font-size:12.5px;color:#999;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${(n.body||'').slice(0,60)||'No additional text'}</div>
+            </div>`).join('');
+          list.querySelectorAll('[data-id]').forEach(el=>{
+            el.onclick = ()=>{ activeId = Number(el.dataset.id); view='editor'; renderMobile(); };
+          });
+          container.querySelector('#notes-add').onclick = ()=>{
+            const id = Date.now();
+            notes.unshift({id, title:'New Note', body:''});
+            activeId = id; save(notes); view='editor'; renderMobile();
+          };
+        } else {
+          const n = notes.find(x=>x.id===activeId);
+          container.innerHTML = `
+            <div style="display:flex;flex-direction:column;height:100%;">
+              <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.06);">
+                <div id="notes-back" style="width:30px;height:30px;border-radius:50%;background:rgba(0,0,0,.06);display:flex;align-items:center;justify-content:center;cursor:pointer;">‹</div>
+                <span style="font-size:13px;color:#888;">All Notes</span>
+              </div>
+              <input id="notes-title" value="${(n.title||'').replace(/"/g,'&quot;')}" style="border:none;outline:none;font-size:18px;font-weight:700;padding:16px 18px 6px;" placeholder="Title">
+              <textarea id="notes-body" style="border:none;outline:none;resize:none;flex:1;padding:0 18px 18px;font-size:15px;line-height:1.6;font-family:inherit;color:#333;" placeholder="Start typing...">${n.body||''}</textarea>
+            </div>`;
+          container.querySelector('#notes-back').onclick = ()=>{ view='list'; renderMobile(); };
+          container.querySelector('#notes-title').addEventListener('input', e=>{ n.title=e.target.value; save(notes); });
+          container.querySelector('#notes-body').addEventListener('input', e=>{ n.body=e.target.value; save(notes); });
+        }
+      }
+      renderMobile();
+      return;
+    }
+
+    container.innerHTML = `
+      <div style="display:flex;height:100%;">
+        <div style="width:200px;border-right:1px solid rgba(0,0,0,.08);display:flex;flex-direction:column;">
+          <div style="padding:10px;border-bottom:1px solid rgba(0,0,0,.06);display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-weight:700;font-size:13px;">Notes</span>
+            <span id="notes-add" style="cursor:pointer;font-size:16px;">➕</span>
+          </div>
+          <div id="notes-list" style="overflow-y:auto;flex:1;"></div>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;">
+          <input id="notes-title" style="border:none;outline:none;font-size:17px;font-weight:700;padding:16px 18px 6px;" placeholder="Title">
+          <textarea id="notes-body" style="border:none;outline:none;resize:none;flex:1;padding:0 18px 18px;font-size:14px;line-height:1.6;font-family:inherit;color:#333;" placeholder="Start typing..."></textarea>
+        </div>
+      </div>`;
+
+    function renderList(){
+      const list = container.querySelector('#notes-list');
+      list.innerHTML = notes.map(n=>`
+        <div data-id="${n.id}" style="padding:11px 14px;border-bottom:1px solid rgba(0,0,0,.05);cursor:pointer;${n.id===activeId?'background:rgba(59,130,246,.1);':''}">
+          <div style="font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${n.title||'Untitled'}</div>
+          <div style="font-size:11px;color:#999;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${(n.body||'').slice(0,40)}</div>
+        </div>`).join('');
+      list.querySelectorAll('[data-id]').forEach(el=>{
+        el.onclick = ()=>{ activeId = Number(el.dataset.id); renderList(); loadActive(); };
+      });
+    }
+    function loadActive(){
+      const n = notes.find(x=>x.id===activeId);
+      container.querySelector('#notes-title').value = n.title||'';
+      container.querySelector('#notes-body').value = n.body||'';
+    }
+    function persistActive(){
+      const n = notes.find(x=>x.id===activeId);
+      n.title = container.querySelector('#notes-title').value;
+      n.body = container.querySelector('#notes-body').value;
+      save(notes); renderList();
+    }
+    container.querySelector('#notes-title').addEventListener('input', persistActive);
+    container.querySelector('#notes-body').addEventListener('input', persistActive);
+    container.querySelector('#notes-add').addEventListener('click', ()=>{
+      const id = Date.now();
+      notes.unshift({id, title:'New Note', body:''});
+      activeId = id; save(notes); renderList(); loadActive();
+      container.querySelector('#notes-title').focus();
+    });
+    renderList(); loadActive();
+  }
+});
+
+/* ---------- Calculator ---------- */
+registerApp({
+  id:'calculator', name:'Calculator', icon:'🧮', bg:'bg-gray', w:300, h:440, singleton:true,
+  render(container){
+    container.innerHTML = `
+      <div style="display:flex;flex-direction:column;height:100%;background:#1c1c26;color:#fff;">
+        <div id="calc-display" style="flex:1;display:flex;align-items:flex-end;justify-content:flex-end;padding:20px;font-size:42px;font-weight:300;word-break:break-all;">0</div>
+        <div id="calc-pad" style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:rgba(255,255,255,.08);">
+        </div>
+      </div>`;
+    const keys = ['C','±','%','÷','7','8','9','×','4','5','6','−','1','2','3','+','0','.','=',''];
+    const pad = container.querySelector('#calc-pad');
+    let expr = '';
+    function fmt(v){ return v===''? '0': v; }
+    function updateDisplay(){ container.querySelector('#calc-display').textContent = fmt(expr); }
+    keys.forEach(k=>{
+      if(k==='') { const sp=document.createElement('div'); sp.style.background='#1c1c26'; pad.appendChild(sp); return; }
+      const b = document.createElement('button');
+      const isOp = ['÷','×','−','+','='].includes(k);
+      b.textContent = k;
+      b.style.cssText = `padding:18px 0;font-size:18px;background:${isOp?'#3b82f6':'#23232f'};color:#fff;border:none;cursor:pointer;`;
+      if(k==='0') b.style.gridColumn='span 1';
+      b.onmouseover=()=>b.style.opacity='.85'; b.onmouseout=()=>b.style.opacity='1';
+      b.onclick = ()=>{
+        if(k==='C'){ expr=''; }
+        else if(k==='='){
+          try{
+            let safe = expr.replace(/×/g,'*').replace(/÷/g,'/').replace(/−/g,'-');
+            // eslint-disable-next-line no-eval
+            const res = Function('"use strict";return ('+safe+')')();
+            expr = String(Math.round(res*100000)/100000);
+          }catch(e){ expr='Error'; }
+        }
+        else if(k==='±'){ expr = expr.startsWith('-') ? expr.slice(1) : '-'+expr; }
+        else if(k==='%'){ try{ expr = String(Function('"use strict";return ('+expr.replace(/×/g,'*').replace(/÷/g,'/').replace(/−/g,'-')+')')()/100); }catch(e){} }
+        else { expr += k; }
+        updateDisplay();
+      };
+      pad.appendChild(b);
+    });
+    updateDisplay();
+  }
+});
+
+/* ---------- Settings (Personalization lives here) ---------- */
+registerApp({
+  id:'settings', name:'Settings', icon:'⚙️', bg:'bg-indigo', w:680, h:480, singleton:true,
+  render(container, api){
+    const sections = ['Personalization','Account','Display','Sound','About'];
+    const isMobile = api && api.isMobile;
+    container.innerHTML = isMobile ? `
+      <div style="display:flex;flex-direction:column;height:100%;">
+        <div style="display:flex;gap:6px;padding:10px 12px;border-bottom:1px solid rgba(0,0,0,.07);overflow-x:auto;white-space:nowrap;">
+          ${sections.map((s,i)=>`<div data-sec="${s}" class="set-nav-item" style="padding:8px 14px;border-radius:999px;font-size:13px;cursor:pointer;flex-shrink:0;${i===0?'background:rgba(59,130,246,.15);font-weight:600;':'background:rgba(0,0,0,.04);'}">${s}</div>`).join('')}
+        </div>
+        <div style="flex:1;padding:20px;overflow-y:auto;" id="settings-panel"></div>
+      </div>` : `
+      <div style="display:flex;height:100%;">
+        <div style="width:190px;background:rgba(0,0,0,.035);border-right:1px solid rgba(0,0,0,.07);padding:14px 8px;">
+          ${sections.map((s,i)=>`<div data-sec="${s}" class="set-nav-item" style="padding:10px 12px;border-radius:9px;font-size:13px;margin-bottom:2px;cursor:pointer;${i===0?'background:rgba(59,130,246,.15);font-weight:600;':''}">${s}</div>`).join('')}
+        </div>
+        <div style="flex:1;padding:24px;overflow-y:auto;" id="settings-panel"></div>
+      </div>`;
+
+    const WP_OPTIONS = [
+      {id:'aurora', label:'Aurora', sw:'linear-gradient(160deg,#284b8f,#161b30)'},
+      {id:'sunset', label:'Sunset', sw:'linear-gradient(160deg,#ff9966,#ff5e62,#6a3093)'},
+      {id:'mint', label:'Mint', sw:'linear-gradient(160deg,#11998e,#38ef7d)'},
+      {id:'mono', label:'Mono', sw:'linear-gradient(160deg,#232526,#414345)'},
+      {id:'violet', label:'Violet', sw:'linear-gradient(160deg,#5b2a86,#1a0b2e)'}
+    ];
+    const ACCENTS = ['#3b82f6','#8b5cf6','#ec4899','#f97316','#22c55e','#06b6d4','#ef4444','#eab308'];
+
+    function panelPersonalization(){
+      return `
+        <div style="font-size:20px;font-weight:700;margin-bottom:20px;">Personalization</div>
+        <div style="font-size:13px;font-weight:600;color:#888;margin-bottom:10px;">WALLPAPER</div>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:28px;">
+          ${WP_OPTIONS.map(w=>`
+            <div data-wp="${w.id}" style="cursor:pointer;text-align:center;">
+              <div style="width:90px;height:60px;border-radius:12px;background:${w.sw};border:3px solid ${prefs.wallpaper===w.id?'#3b82f6':'transparent'};"></div>
+              <div style="font-size:11.5px;margin-top:6px;color:#555;">${w.label}</div>
+            </div>`).join('')}
+        </div>
+        <div style="font-size:13px;font-weight:600;color:#888;margin-bottom:10px;">ACCENT COLOR</div>
+        <div style="display:flex;gap:12px;margin-bottom:10px;">
+          ${ACCENTS.map(c=>`<div data-accent="${c}" style="width:32px;height:32px;border-radius:50%;background:${c};cursor:pointer;border:3px solid ${prefs.accent===c?'#222':'transparent'};box-shadow:0 2px 6px rgba(0,0,0,.2);"></div>`).join('')}
+        </div>
+      `;
+    }
+    function panelAccount(){
+      return `
+        <div style="font-size:20px;font-weight:700;margin-bottom:20px;">Account</div>
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
+          <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(150deg,var(--xenon-400),var(--xenon-600));display:flex;align-items:center;justify-content:center;font-size:26px;">${Xenon.user.avatar}</div>
+          <div>
+            <div style="font-weight:700;font-size:16px;">${Xenon.user.name}</div>
+            <div style="font-size:12.5px;color:#888;">Local account · created ${new Date(Xenon.user.createdAt).toLocaleDateString()}</div>
+          </div>
+        </div>
+        <div style="font-size:13px;font-weight:600;color:#888;margin-bottom:8px;">CHANGE PASSWORD</div>
+        <div style="display:flex;flex-direction:column;gap:10px;max-width:300px;">
+          <input id="set-newpass" type="password" placeholder="New password" style="padding:10px 14px;border-radius:10px;border:1px solid rgba(0,0,0,.12);outline:none;font-size:13.5px;">
+          <button id="set-savepass" style="background:#3b82f6;color:#fff;padding:10px;border-radius:10px;font-weight:600;font-size:13.5px;">Save password</button>
+          <div id="set-pass-msg" style="font-size:12px;color:#16a34a;height:14px;"></div>
+        </div>
+        <div style="margin-top:24px;">
+          <button id="set-signout" style="background:rgba(239,68,68,.1);color:#dc2626;padding:9px 16px;border-radius:10px;font-weight:600;font-size:13px;">Sign out</button>
+        </div>
+      `;
+    }
+    function panelDisplay(){
+      return `<div style="font-size:20px;font-weight:700;margin-bottom:20px;">Display</div>
+        <div style="font-size:13px;color:#777;line-height:1.7;">Device detected: <b>${Xenon.device}</b><br>Resolution: <b>${window.innerWidth}×${window.innerHeight}</b><br>Rounded corners: <b>enabled</b></div>`;
+    }
+    function panelSound(){
+      return `<div style="font-size:20px;font-weight:700;margin-bottom:20px;">Sound</div>
+        <div style="display:flex;align-items:center;gap:12px;max-width:280px;">
+          <span>🔈</span><input type="range" min="0" max="100" value="70" style="flex:1;"><span>🔊</span>
+        </div>`;
+    }
+    function panelAbout(){
+      return `<div style="font-size:20px;font-weight:700;margin-bottom:16px;">About xenonOS</div>
+        <div style="font-size:13.5px;color:#666;line-height:1.8;">
+          <b>xenonOS</b> — a web-based operating system.<br>
+          Version 1.0 "Argon"<br>
+          Signed in as ${Xenon.user.name}<br>
+          Device mode: ${Xenon.device}
+        </div>`;
+    }
+    const panels = { Personalization:panelPersonalization, Account:panelAccount, Display:panelDisplay, Sound:panelSound, About:panelAbout };
+
+    function renderPanel(name){
+      const panel = container.querySelector('#settings-panel');
+      panel.innerHTML = panels[name]();
+      if(name==='Personalization'){
+        panel.querySelectorAll('[data-wp]').forEach(el=>{
+          el.onclick = ()=>{ prefs.wallpaper = el.dataset.wp; savePrefs(prefs); applyWallpaper(); renderPanel('Personalization'); };
+        });
+        panel.querySelectorAll('[data-accent]').forEach(el=>{
+          el.onclick = ()=>{ prefs.accent = el.dataset.accent; savePrefs(prefs); applyAccent(); renderPanel('Personalization'); };
+        });
+      }
+      if(name==='Account'){
+        panel.querySelector('#set-savepass').onclick = ()=>{
+          const v = panel.querySelector('#set-newpass').value;
+          if(v.length<4){ panel.querySelector('#set-pass-msg').style.color='#dc2626'; panel.querySelector('#set-pass-msg').textContent='Too short (min 4 chars)'; return; }
+          Xenon.user.pass = v; saveUser(Xenon.user);
+          panel.querySelector('#set-pass-msg').style.color='#16a34a';
+          panel.querySelector('#set-pass-msg').textContent='Password updated';
+          panel.querySelector('#set-newpass').value='';
+        };
+        panel.querySelector('#set-signout').onclick = ()=>{ lockNow(); };
+      }
+    }
+    container.querySelectorAll('.set-nav-item').forEach(el=>{
+      el.onclick = ()=>{
+        container.querySelectorAll('.set-nav-item').forEach(n=>{ n.style.background='none'; n.style.fontWeight='400'; });
+        el.style.background='rgba(59,130,246,.15)'; el.style.fontWeight='600';
+        renderPanel(el.dataset.sec);
+      };
+    });
+    renderPanel('Personalization');
+  }
+});
+
+/* ---------- Photos ---------- */
+registerApp({
+  id:'photos', name:'Photos', icon:'🖼️', bg:'bg-pink', w:680, h:460,
+  render(container){
+    const colors = ['#fca5a5','#fdba74','#fde047','#86efac','#93c5fd','#c4b5fd','#f9a8d4','#67e8f9','#fcd34d','#a5b4fc','#fda4af','#5eead4'];
+    container.innerHTML = `
+      <div style="padding:20px;height:100%;overflow-y:auto;">
+        <div style="font-weight:700;font-size:16px;margin-bottom:14px;">All Photos</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,120px);gap:10px;">
+          ${colors.map((c,i)=>`<div style="width:120px;height:120px;border-radius:14px;background:linear-gradient(160deg,${c},#fff);display:flex;align-items:center;justify-content:center;font-size:26px;cursor:pointer;">🏞️</div>`).join('')}
+        </div>
+      </div>`;
+  }
+});
+
+/* ---------- Terminal ---------- */
+registerApp({
+  id:'terminal', name:'Terminal', icon:'⬛', bg:'bg-gray', w:600, h:400, dark:true,
+  render(container){
+    container.innerHTML = `
+      <div style="height:100%;display:flex;flex-direction:column;padding:14px;font-family:'SF Mono',Consolas,monospace;font-size:13px;color:#a3f7a3;background:#0c0c10;">
+        <div id="term-log" style="flex:1;overflow-y:auto;white-space:pre-wrap;line-height:1.6;"></div>
+        <div style="display:flex;gap:6px;">
+          <span style="color:#60a5fa;">${Xenon.user.name}@xenonOS ~ %</span>
+          <input id="term-input" style="background:none;border:none;outline:none;color:#a3f7a3;flex:1;font-family:inherit;font-size:13px;">
+        </div>
+      </div>`;
+    const log = container.querySelector('#term-log');
+    const input = container.querySelector('#term-input');
+    function println(t){ log.innerHTML += t+'\n'; log.scrollTop = log.scrollHeight; }
+    println(`xenonOS Terminal [Version 1.0]\nType "help" for a list of commands.\n`);
+    const cmds = {
+      help:()=>'Available: help, whoami, date, clear, echo [text], neofetch',
+      whoami:()=>Xenon.user.name,
+      date:()=>new Date().toString(),
+      neofetch:()=>`xenonOS v1.0 "Argon"\nUser: ${Xenon.user.name}\nDevice: ${Xenon.device}\nShell: xsh`,
+    };
+    input.addEventListener('keydown', e=>{
+      if(e.key!=='Enter') return;
+      const raw = input.value; input.value='';
+      println(`${Xenon.user.name}@xenonOS ~ % ${raw}`);
+      const [cmd, ...rest] = raw.trim().split(' ');
+      if(cmd==='clear'){ log.innerHTML=''; return; }
+      if(cmd==='echo'){ println(rest.join(' ')); return; }
+      if(cmds[cmd]) println(cmds[cmd]());
+      else if(cmd) println(`command not found: ${cmd}`);
+    });
+  }
+});
+
+/* ---------- Mail ---------- */
+registerApp({
+  id:'mail', name:'Mail', icon:'✉️', bg:'bg-red', w:700, h:480,
+  render(container, api){
+    const emails = [
+      {f:'xenonOS Team', s:'Welcome to xenonOS!', p:'Thanks for setting up your account. Explore the Start Menu to find all your apps.'},
+      {f:'Security', s:'Your account was created', p:'A new local account was created on this device.'},
+      {f:'Updates', s:'xenonOS 1.0 "Argon" is here', p:'Enjoy the new rounded interface and personalization options.'}
+    ];
+
+    if(api && api.isMobile){
+      let view='list', activeI=0;
+      function renderMobile(){
+        if(view==='list'){
+          container.innerHTML = `<div style="overflow-y:auto;height:100%;">
+            ${emails.map((e,i)=>`<div data-i="${i}" class="mail-item" style="padding:14px 16px;border-bottom:1px solid rgba(0,0,0,.06);">
+              <div style="font-weight:700;font-size:14px;">${e.f}</div>
+              <div style="font-size:13px;color:#444;margin-top:2px;">${e.s}</div>
+              <div style="font-size:12px;color:#999;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${e.p}</div>
+            </div>`).join('')}
+          </div>`;
+          container.querySelectorAll('.mail-item').forEach(el=>{
+            el.onclick = ()=>{ activeI = Number(el.dataset.i); view='detail'; renderMobile(); };
+          });
+        } else {
+          const e = emails[activeI];
+          container.innerHTML = `
+            <div style="display:flex;flex-direction:column;height:100%;">
+              <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.06);">
+                <div id="mail-back" style="width:30px;height:30px;border-radius:50%;background:rgba(0,0,0,.06);display:flex;align-items:center;justify-content:center;cursor:pointer;">‹</div>
+                <span style="font-size:13px;color:#888;">Inbox</span>
+              </div>
+              <div style="padding:20px;">
+                <div style="font-size:17px;font-weight:700;margin-bottom:4px;">${e.s}</div>
+                <div style="font-size:13px;color:#888;margin-bottom:18px;">From ${e.f}</div>
+                <div style="font-size:14.5px;line-height:1.7;color:#333;">${e.p}</div>
+              </div>
+            </div>`;
+          container.querySelector('#mail-back').onclick = ()=>{ view='list'; renderMobile(); };
+        }
+      }
+      renderMobile();
+      return;
+    }
+
+    container.innerHTML = `
+      <div style="display:flex;height:100%;">
+        <div style="width:260px;border-right:1px solid rgba(0,0,0,.08);overflow-y:auto;">
+          ${emails.map((e,i)=>`<div data-i="${i}" class="mail-item" style="padding:13px 16px;border-bottom:1px solid rgba(0,0,0,.05);cursor:pointer;${i===0?'background:rgba(59,130,246,.08);':''}">
+            <div style="font-weight:700;font-size:13px;">${e.f}</div>
+            <div style="font-size:12.5px;color:#444;margin-top:2px;">${e.s}</div>
+            <div style="font-size:11.5px;color:#999;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${e.p}</div>
+          </div>`).join('')}
+        </div>
+        <div id="mail-detail" style="flex:1;padding:24px;"></div>
+      </div>`;
+    function showMail(i){
+      const e = emails[i];
+      container.querySelector('#mail-detail').innerHTML = `<div style="font-size:18px;font-weight:700;margin-bottom:4px;">${e.s}</div><div style="font-size:13px;color:#888;margin-bottom:20px;">From ${e.f}</div><div style="font-size:14px;line-height:1.7;color:#333;">${e.p}</div>`;
+    }
+    container.querySelectorAll('.mail-item').forEach(el=>{
+      el.onclick = ()=>{ container.querySelectorAll('.mail-item').forEach(n=>n.style.background='none'); el.style.background='rgba(59,130,246,.08)'; showMail(Number(el.dataset.i)); };
+    });
+    showMail(0);
+  }
+});
+
+/* ---------- Weather ---------- */
+registerApp({
+  id:'weather', name:'Weather', icon:'⛅', bg:'bg-teal', w:340, h:460,
+  render(container){
+    container.innerHTML = `
+      <div style="height:100%;background:linear-gradient(160deg,#4f8cff,#2563eb);color:#fff;display:flex;flex-direction:column;align-items:center;padding:30px 20px;">
+        <div style="font-size:16px;font-weight:600;">Vista, CA</div>
+        <div style="font-size:64px;margin:6px 0;">☀️</div>
+        <div style="font-size:46px;font-weight:300;">74°</div>
+        <div style="font-size:13px;opacity:.85;margin-bottom:24px;">Sunny · H:78° L:62°</div>
+        <div style="display:flex;gap:16px;width:100%;justify-content:space-between;border-top:1px solid rgba(255,255,255,.25);padding-top:16px;">
+          ${['Mon','Tue','Wed','Thu','Fri'].map((d,i)=>`<div style="display:flex;flex-direction:column;align-items:center;gap:6px;font-size:11.5px;">
+            <span>${d}</span><span>${['☀️','⛅','⛅','🌧️','☀️'][i]}</span><span>${[76,73,70,68,75][i]}°</span>
+          </div>`).join('')}
+        </div>
+      </div>`;
+  }
+});
+
+/* ---------- Clock ---------- */
+registerApp({
+  id:'clock', name:'Clock', icon:'🕐', bg:'bg-gray', w:320, h:380,
+  render(container){
+    container.innerHTML = `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;">
+      <div id="clock-big" style="font-size:48px;font-weight:300;font-family:monospace;"></div>
+      <div id="clock-date" style="font-size:14px;color:#888;"></div>
+    </div>`;
+    function tick(){
+      const n = new Date();
+      container.querySelector('#clock-big').textContent = n.toLocaleTimeString();
+      container.querySelector('#clock-date').textContent = n.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+    }
+    tick(); const iv = setInterval(tick,1000);
+    new MutationObserver(()=>{ if(!document.body.contains(container)) clearInterval(iv); }).observe(document.body,{childList:true,subtree:true});
+  }
+});
+
+/* ---------- Calendar ---------- */
+registerApp({
+  id:'calendar', name:'Calendar', icon:'📅', bg:'bg-red', w:480, h:440,
+  render(container){
+    const now = new Date();
+    const year = now.getFullYear(), month = now.getMonth();
+    const first = new Date(year, month, 1);
+    const daysInMonth = new Date(year, month+1, 0).getDate();
+    const startDay = first.getDay();
+    let cells = '';
+    for(let i=0;i<startDay;i++) cells += `<div></div>`;
+    for(let d=1; d<=daysInMonth; d++){
+      const isToday = d===now.getDate();
+      cells += `<div style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:50%;font-size:13px;${isToday?'background:#3b82f6;color:#fff;font-weight:700;':''}">${d}</div>`;
+    }
+    container.innerHTML = `
+      <div style="padding:22px;">
+        <div style="font-size:18px;font-weight:700;margin-bottom:16px;">${first.toLocaleDateString(undefined,{month:'long',year:'numeric'})}</div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:8px;">
+          ${['S','M','T','W','T','F','S'].map(d=>`<div style="text-align:center;font-size:11px;color:#999;font-weight:600;">${d}</div>`).join('')}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;">${cells}</div>
+      </div>`;
+  }
+});
+
+/* ---------- Music ---------- */
+registerApp({
+  id:'music', name:'Music', icon:'🎵', bg:'bg-purple', w:380, h:460, dark:true,
+  render(container){
+    const tracks = [
+      {t:'Argon Glow', a:'xenon collective', d:'3:42'},
+      {t:'Noble Drift', a:'xenon collective', d:'4:01'},
+      {t:'Blue Discharge', a:'static field', d:'2:58'},
+      {t:'Rounded Edges', a:'static field', d:'3:15'}
+    ];
+    container.innerHTML = `
+      <div style="padding:20px;height:100%;display:flex;flex-direction:column;">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:20px;">
+          <div style="width:140px;height:140px;border-radius:18px;background:linear-gradient(160deg,#818cf8,#4f46e5);display:flex;align-items:center;justify-content:center;font-size:48px;">🎵</div>
+          <div style="font-weight:700;font-size:15px;">Argon Glow</div>
+          <div style="font-size:12.5px;opacity:.6;">xenon collective</div>
+          <div style="display:flex;gap:22px;align-items:center;margin-top:8px;font-size:20px;">
+            <span>⏮️</span><span style="font-size:30px;">⏸️</span><span>⏭️</span>
+          </div>
+        </div>
+        <div style="flex:1;overflow-y:auto;border-top:1px solid var(--line);padding-top:10px;">
+          ${tracks.map(tr=>`<div style="display:flex;justify-content:space-between;padding:9px 6px;border-radius:8px;cursor:pointer;" onmouseover="this.style.background='rgba(255,255,255,.06)'" onmouseout="this.style.background='none'">
+            <div><div style="font-size:13px;font-weight:600;">${tr.t}</div><div style="font-size:11.5px;opacity:.55;">${tr.a}</div></div>
+            <div style="font-size:12px;opacity:.5;align-self:center;">${tr.d}</div>
+          </div>`).join('')}
+        </div>
+      </div>`;
+  }
+});
+
+/* ---------- Trash ---------- */
+registerApp({
+  id:'trash', name:'Trash', icon:'🗑️', bg:'bg-gray', w:420, h:340,
+  render(container){
+    container.innerHTML = `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#888;">
+      <div style="font-size:46px;">🗑️</div>
+      <div style="font-size:14px;font-weight:600;">Trash is empty</div>
+    </div>`;
+  }
+});
+</script>
+
+</body>
+</html>
